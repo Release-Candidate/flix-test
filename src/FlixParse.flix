@@ -7,11 +7,37 @@
 //
 // ==============================================================================
 
+use GradedFunctor
 use Alternative.{<|>, choice, empty}
 
-type alias Parser[i, a] = List[i] -> Result[Error[i], (a, List[i])]
+enum Error[i] with Eq, ToString {
+    case EndOfInput,
+    case Unexpected(i, i)
+    case Empty
+}
 
-pub def runParser[i: Type, a: Type](parser: Parser[i, a], input: List[i]): Result[String, (a, List[i])] with ToString[i] =
+type alias ParserType[i: Type, o: Type, ef: Bool] = List[i] -> Result[Error[i], (o, List[i])] \ ef
+
+pub enum Parser[i: Type, ef: Bool, o: Type] {
+    case Parser(ParserType[i, o, ef])
+}
+
+mod Parser {
+    pub def map(f: a -> b \ ef, parseFunc: Parser[i, ff, a]): Parser[i, ff and ef, b] =
+        let Parser.Parser(pf) = parseFunc;
+        Parser.Parser(input -> match pf(input) {
+            case Ok(output, l) => Ok(f(output), l)
+            case Err(err) => Err(err)
+        })
+}
+
+instance GradedFunctor[Parser[i]] {
+
+    pub def map(f: a -> b \ ef, parseFunc: Parser[i, ff, a]): Parser[i, ef and ff, b] =
+        Parser.map(f, parseFunc)
+}
+
+pub def runParser(parser: ParserType[i, o, Pure], input: List[i]): Result[String, (o, List[i])] with ToString[i] =
     match parser(input) {
         case Ok(o) => Ok(o)
         case Err(error) => match error {
@@ -21,13 +47,9 @@ pub def runParser[i: Type, a: Type](parser: Parser[i, a], input: List[i]): Resul
         }
     }
 
-enum Error[i] with Eq, ToString {
-    case EndOfInput,
-    case Unexpected(i, i)
-    case Empty
-}
 
-pub def satisfy[i: Type](pred: i -> (Bool, i)): Parser[i, i] =
+
+pub def satisfy(pred: i -> (Bool, i) \ ef): ParserType[i, i, ef] =
     input -> match input {
         case Nil => Err(Error.EndOfInput)
         case x :: xs => match pred(x) {
@@ -37,7 +59,9 @@ pub def satisfy[i: Type](pred: i -> (Bool, i)): Parser[i, i] =
         }
     }
 
-pub def charParser(input: Char): Parser[Char, Char] = satisfy(c -> (input == c, input))
+pub def charParser(input: Char): ParserType[Char, Char, Pure] =
+    satisfy(c -> (input == c, input))
+
 
 @Test
 def test1(): Bool =
