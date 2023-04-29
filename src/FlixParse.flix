@@ -24,6 +24,9 @@ pub enum Parser[i: Type, ef: Bool, o: Type] {
 
 mod Parser {
 
+    pub def empty(): Parser[i, Pure, a] =
+        Parser.Parser(_ -> Err(Error.Empty))
+
     pub def point(x: a): Parser[i, Pure, a] =
         Parser.Parser(input -> Ok(x, input))
 
@@ -54,6 +57,17 @@ mod Parser {
                 let Parser.Parser(result) = f(y);
                 result(ly)
             })
+
+    pub def or(l: Parser[i][ef, a], r: Parser[i][ef, a]): Parser[i][ef, a] =
+        let Parser.Parser(lp) = l;
+        let Parser.Parser(rp) = r;
+        Parser.Parser(input -> match lp(input) {
+            case Ok(ok, ll) => Ok(ok, ll)
+            case Err(_) => match rp(input) {
+                case Ok(okR, lr) => Ok(okR, lr)
+                case Err(errR) => Err(errR)
+            }
+        })
 }
 
 instance GradedFunctor[Parser[i]] {
@@ -76,6 +90,16 @@ instance GradedMonad[Parser[i]] {
     pub def flatMap(f: a -> Parser[i][ef1, b] & ef, x: Parser[i][ef2, a]): Parser[i][ef1 and ef2 and ef, b] =
         Parser.flatMap(f, x)
 }
+
+instance GradedAlternative[Parser[i]] {
+
+    pub def empty(): Parser[i][ef, a] =
+        checked_cast(Parser.empty())
+
+    pub def or(l: Parser[i][ef, a], r: Parser[i][ef, a]): Parser[i][ef, a] =
+        Parser.or(l, r)
+}
+
 
 pub def runParser(parser: ParserType[i, o, ef], input: List[i]): Result[String, (o, List[i])] \ ef with ToString[i] =
     match parser(input) {
