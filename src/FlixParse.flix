@@ -8,7 +8,6 @@
 // ==============================================================================
 
 use GradedFunctor
-use Alternative.{<|>, choice, empty}
 
 enum Error[i] with Eq, ToString {
     case EndOfInput,
@@ -23,7 +22,6 @@ pub enum Parser[i: Type, ef: Bool, o: Type] {
 }
 
 mod Parser {
-
     pub def empty(): Parser[i, Pure, a] =
         Parser.Parser(_ -> Err(Error.Empty))
 
@@ -101,8 +99,9 @@ instance GradedAlternative[Parser[i]] {
 }
 
 
-pub def runParser(parser: ParserType[i, o, ef], input: List[i]): Result[String, (o, List[i])] \ ef with ToString[i] =
-    match parser(input) {
+pub def runParser(parser: Parser[i, ef, o], input: List[i]): Result[String, (o, List[i])] \ ef with ToString[i] =
+    let Parser.Parser(pf) = parser;
+    match pf(input) {
         case Ok(o) => Ok(o)
         case Err(error) => match error {
             case Error.EndOfInput => Err("Unexpected end of input.")
@@ -113,17 +112,17 @@ pub def runParser(parser: ParserType[i, o, ef], input: List[i]): Result[String, 
 
 
 
-pub def satisfy(pred: i -> (Bool, i) \ ef): ParserType[i, i, ef] =
-    input -> match input {
+pub def satisfy(pred: i -> (Bool, i) \ ef): Parser[i, ef, i] =
+    Parser.Parser(input -> match input {
         case Nil => Err(Error.EndOfInput)
         case x :: xs => match pred(x) {
             case (false, c) => Err(Error.Unexpected(x, c))
             case (true, _) => Ok(x, xs)
             case _ => Err(Error.Empty)
         }
-    }
+    })
 
-pub def charParser(input: Char): ParserType[Char, Char, Pure] =
+pub def charParser(input: Char): Parser[Char, Pure, Char] =
     satisfy(c -> (input == c, input))
 
 
