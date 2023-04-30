@@ -93,6 +93,7 @@ pub lawful class Alternative[m: Type -> Type] with Applicative[m] {
     /// The identity of the monoid.
     ///
     /// `empty() <|> x == x <|> empty() == x`.
+    ///
     pub def empty(): m[a]
 
     /// Choose the left `l` or the right `r`.
@@ -101,29 +102,37 @@ pub lawful class Alternative[m: Type -> Type] with Applicative[m] {
     /// an error, ...
     ///
     /// The same as `l <|> r`.
+    ///
     pub def or(l: m[a], r: m[a]): m[a]
 
     /// Alternative with `empty` and `or/<|>` forms a monoid:
 
     /// `empty()` is the right identitiy of `or/<|>`.
+    ///
     law rightIdentity: forall(l: m[a]) with Eq[m[a]] . Alternative.or(l, Alternative.empty()) == l
 
     /// `empty()` is the left identitiy of `or/<|>`.
+    ///
     law leftIdentity: forall(r: m[a]) with Eq[m[a]] . Alternative.or(Alternative.empty(), r) == r
 
     /// `or/<|>` is associative.
+    ///
     law associative: forall(x: m[a], y: m[a], z: m[a]) with Eq[m[a]] . Alternative.or(x, Alternative.or(y, z)) == Alternative.or(Alternative.or(x, y), z)
 
     /// `Applicative.point` is always valid/true/...
+    ///
     law leftOne: forall(r: m[a], x: a) with Eq[m[a]] . Alternative.or(Applicative.point(x), r) == Applicative.point(x)
 }
 
 mod Alternative {
+
     /// An alias of `Alternative.or`.
+    ///
     pub def <|>(l: m[a], r: m[a]): m[a] with Alternative[m] = Alternative.or(l, r)
 
     /// `choice([a1, a2, ..., an])` is the same as `a1 <|> a2 <|> ... <|> an`.
     // The leftmost valid/true/... value is returned.
+    ///
     pub def choice(l: List[m[a]]): m[a] with Alternative[m] =
         match l {
             case Nil => Alternative.empty()
