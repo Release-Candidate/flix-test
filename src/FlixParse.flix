@@ -7,8 +7,6 @@
 //
 // ==============================================================================
 
-use GradedFunctor
-
 enum Error[i] with Eq, ToString {
     case EndOfInput,
     case Unexpected(i, i)
@@ -18,7 +16,8 @@ enum Error[i] with Eq, ToString {
 type alias ParserType[i: Type, o: Type, ef: Bool] = List[i] -> Result[Error[i], (o, List[i])] \ ef
 
 pub enum Parser[i: Type, ef: Bool, o: Type] {
-    case Parser(List[i] -> Result[Error[i], (o, List[i])] \ ef)
+   // case Parser(List[i] -> Result[Error[i], (o, List[i])] \ ef)
+    case Parser(ParserType[i, o, ef])
 }
 
 mod Parser {
@@ -28,14 +27,14 @@ mod Parser {
     pub def point(x: a): Parser[i, Pure, a] =
         Parser.Parser(input -> Ok(x, input))
 
-    pub def map(f: a -> b \ ef, parseFunc: Parser[i, ff, a]): Parser[i, ff and ef, b] =
-        let Parser.Parser(pf) = parseFunc;
+    pub def map(f: a -> b \ ef, p: Parser[i, ff, a]): Parser[i, ff and ef, b] =
+        let Parser.Parser(pf) = p;
         Parser.Parser(input -> match pf(input) {
             case Ok(output, l) => Ok(f(output), l)
             case Err(err) => Err(err)
         })
 
-    pub def ap(f: Parser[i][ef1, a -> b & ef2], x: Parser[i][ef, a]): Parser[i][ef and ef1 and ef2, b] =
+    pub def ap(f: Parser[i, ef1, a -> b & ef2], x: Parser[i, ef, a]): Parser[i, ef and ef1 and ef2, b] =
         let Parser.Parser(pfab) = f;
         let Parser.Parser(pfa) = x;
         Parser.Parser(input -> match pfab(input) {
@@ -47,7 +46,7 @@ mod Parser {
             }
         )
 
-    pub def flatMap(f: a -> Parser[i][ef1, b] & ef, x: Parser[i][ef2, a]): Parser[i][ef1 and ef2 and ef, b] =
+    pub def flatMap(f: a -> Parser[i, ef1, b] & ef, x: Parser[i, ef2, a]): Parser[i, ef1 and ef2 and ef, b] =
         let Parser.Parser(pfa) = x;
         Parser.Parser(input -> match pfa(input) {
             case Err(err) => Err(err)
@@ -56,12 +55,12 @@ mod Parser {
                 result(ly)
             })
 
-    pub def or(l: Parser[i][ef, a], r: Parser[i][ef, a]): Parser[i][ef, a] =
-        let Parser.Parser(lp) = l;
-        let Parser.Parser(rp) = r;
-        Parser.Parser(input -> match lp(input) {
+    pub def or(l: Parser[i, ef, a], r: Parser[i, ef, a]): Parser[i, ef, a] =
+        let Parser.Parser(lpf) = l;
+        let Parser.Parser(rpf) = r;
+        Parser.Parser(input -> match lpf(input) {
             case Ok(ok, ll) => Ok(ok, ll)
-            case Err(_) => match rp(input) {
+            case Err(_) => match rpf(input) {
                 case Ok(okR, lr) => Ok(okR, lr)
                 case Err(errR) => Err(errR)
             }
@@ -70,31 +69,31 @@ mod Parser {
 
 instance GradedFunctor[Parser[i]] {
 
-    pub def map(f: a -> b \ ef, parseFunc: Parser[i, ff, a]): Parser[i, ef and ff, b] =
-        Parser.map(f, parseFunc)
+    pub def map(f: a -> b \ ef, p: Parser[i, ff, a]): Parser[i, ef and ff, b] =
+        Parser.map(f, p)
 }
 
 instance GradedApplicative[Parser[i]] {
 
-    pub def point(x: a): Parser[i][ef, a] =
+    pub def point(x: a): Parser[i, ef, a] =
         checked_cast(Parser.point(x))
 
-    pub def ap(f: Parser[i][ef1, a -> b & ef2], x: Parser[i][ef, a]): Parser[i][ef and ef1 and ef2, b] =
+    pub def ap(f: Parser[i, ef1, a -> b & ef2], x: Parser[i, ef, a]): Parser[i, ef and ef1 and ef2, b] =
         Parser.ap(f, x)
 }
 
 instance GradedMonad[Parser[i]] {
 
-    pub def flatMap(f: a -> Parser[i][ef1, b] & ef, x: Parser[i][ef2, a]): Parser[i][ef1 and ef2 and ef, b] =
+    pub def flatMap(f: a -> Parser[i, ef1, b] & ef, x: Parser[i, ef2, a]): Parser[i, ef1 and ef2 and ef, b] =
         Parser.flatMap(f, x)
 }
 
 instance GradedAlternative[Parser[i]] {
 
-    pub def empty(): Parser[i][ef, a] =
+    pub def empty(): Parser[i, ef, a] =
         checked_cast(Parser.empty())
 
-    pub def or(l: Parser[i][ef, a], r: Parser[i][ef, a]): Parser[i][ef, a] =
+    pub def or(l: Parser[i, ef, a], r: Parser[i, ef, a]): Parser[i, ef, a] =
         Parser.or(l, r)
 }
 
@@ -110,8 +109,6 @@ pub def runParser(parser: Parser[i, ef, o], input: List[i]): Result[String, (o, 
         }
     }
 
-
-
 pub def satisfy(pred: i -> (Bool, i) \ ef): Parser[i, ef, i] =
     Parser.Parser(input -> match input {
         case Nil => Err(Error.EndOfInput)
@@ -125,6 +122,8 @@ pub def satisfy(pred: i -> (Bool, i) \ ef): Parser[i, ef, i] =
 pub def charParser(input: Char): Parser[Char, Pure, Char] =
     satisfy(c -> (input == c, input))
 
+pub def stringParser(input: String): Parser[Char, Pure, List[Char]] =
+    GradedTraversable.traverse(charParser, String.toList(input))
 
 @Test
 def test1(): Bool =
@@ -139,3 +138,8 @@ def test2(): Bool =
 @Test
 def test3(): Bool =
     Assert.eq(Err("Unexpected end of input."), runParser(charParser('h'), Nil))
+
+@Test
+def test4(): Bool =
+    let hugo = String.toList("Hugo!");
+    Assert.eq(Ok(hugo, '!' :: Nil), runParser(stringParser("Hugo"), hugo))
