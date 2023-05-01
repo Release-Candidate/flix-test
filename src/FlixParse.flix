@@ -8,7 +8,7 @@
 // ==============================================================================
 
 use GradedFunctor.{<$>}
-use GradedApplicative.{*>, <*}
+use GradedApplicative.{*>,<*}
 use GradedAlternative.{<|>, choice}
 
 enum Error[i] with Eq, ToString {

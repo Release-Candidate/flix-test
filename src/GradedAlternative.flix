@@ -9,84 +9,91 @@
 
 
 ///
-/// Example: `Option`
+/// Example: `Check`, a function from `i` to `Option`.
 ///
 /// ```flix
-/// instance Alternative[Option] {
+/// enum Check[i: Type, ef: Bool, a: Type] {
+///     case Check(i -> Option[a] \ ef)
+/// }
 ///
-///     pub def empty(): Option[a] = None
+/// instance GradedAlternative[Check[i]] {
 ///
-///     pub def or(l: Option[a], r: Option[a]): Option[a] = match (l, r) {
-///         case (None, x ) => x
-///      // case (None, None) => None
-///      // case (None, Some(y)) => Some(y)
-///         case (Some(x), _) => Some(x)
-///     }
+///     pub def empty(): Check[i, ef, a] = Check.Check(_ -> checked_ecast(None))
 ///
+///     pub def or(l: Check[i][ef, a], r: Check[i, ef, a]): Check[i, ef, a] =
+///         let Check.Check(lf) = l;
+///         let Check.Check(rf) = r;
+///         Check.Check(y -> match lf(y) {
+///             case None => rf(y)
+///             case Some(lfr) => Some(lfr)
+///         })
 /// }
 /// ```
 ///
-/// Laws for `Option`:
+/// Laws for `Check`:
 ///
-/// rightIdentity: forall(l: Option[a]) with Eq[Option[a]] . Alternative.or(l, Alternative.empty())
-///                                                          == Alternative.or(l, None)
-///                                                          == l    Q.e.d.
+/// rightIdentity: forall(l: m[ef, a]) with Eq[m[ef, a]] . GradedAlternative.or(l, GradedAlternative.empty()) == l
 ///
-/// leftIdentity: forall(r: Option[a]) with Eq[Option[a]] . Alternative.or(Alternative.empty(), r)
-///                                                         == Alternative.or(None, r)
-///                                                         == r    Q.e.d.
 ///
-/// associative: forall(x: Option[a], y: Option[a], z: Option[a]) with Eq[Option[a]] .
-///                       Alternative.or(x, Alternative.or(y, z)) == Alternative.or(Alternative.or(x, y), z)
+/// leftIdentity: forall(r: m[ef, a]) with Eq[m[ef, a]] . GradedAlternative.or(GradedAlternative.empty(), r) == r
 ///
-///       * if x == None: Alternative.or(None, Alternative.or(y, z)) [leftIdentity] == Alternative.or(y, z) and
-///                       Alternative.or(Alternative.or(None, y), z) [leftIdentity] == Alternative.or(y, z)
-///                       Q.e.d.
-///       * if x == Some(u): Alternative.or(Some(u), Alternative.or(y, z)) == Some(u)
-///                          Alternative.or(Alternative.or(Some(u), y), z) == Alternative.or(Some(u), z) == Some(u)
-///                          Q.e.d.
+/// /// `or/<|>` is associative.
+/// associative: forall(x: m[ef, a], y: m[ef, a], z: m[ef, a]) with Eq[m[ef, a]] . GradedAlternative.or(x, GradedAlternative.or(y, z)) == GradedAlternative.or(GradedAlternative.or(x, y), z)
 ///
-/// leftOne: forall(r: Option[a], x: a) with Eq[Option[a]] . Alternative.or(Applicative.point(x), r) == Applicative.point(x)
-///          Remark: Applicative.point(x) = Some(x)
-///                                                          Alternative.or(Some(x), r) == Some(x) == Applicative.point(x)
-///                                                          Q.e.d.
+/// leftOne: forall(r: m[ef, a], x: a) with Eq[m[ef, a]] . GradedAlternative.or(GradedApplicative.point(x), r) == GradedApplicative.point(x)
 ///
-/// Usage for `Option`:
+/// Usage for `Check`:
 ///
 /// ```flix
-/// use Alternative.{or, <|>, choice}
-///
-/// @Test
-/// def testOr(): Bool =
-///     or(Some(5), Some(9)) == Some(5)
-///
-/// @Test
-/// def testOr2(): Bool =
-///     Some(5) <|> Some(9) == Some(5)
-///
-/// @Test
-/// def testOrNone(): Bool =
-///     None <|> Some(9) == Some(9)
-///
-/// @Test
-/// def testOrNone2(): Bool =
-///     None <|> None == None: Option[Int32]
-///
-/// @Test
-/// def testOrChained(): Bool =
-///     None <|> Some(1) <|> Some(2) <|> Some(3) == Some(1)
-//
-/// @Test
-/// def testOrAssoc(): Bool =
-///     Some(1) <|> (Some(2) <|> Some(3)) == (Some(1) <|> Some(2)) <|> Some(3)
-///
-/// @Test
-/// def testOrAssoc2(): Bool =
-///     None <|> (Some(2) <|> Some(3)) == (None <|> Some(2)) <|> Some(3)
-///
-/// @Test
-/// def testChoice(): Bool =
-///     choice(None :: None :: Some(9) :: Some(1) :: Nil) == Some(9)
+// use GradedAlternative.{or, <|>, choice}
+
+// @Test
+// def testOr(): Bool =
+//     let Check.Check(cf) = or(Check.Check(_ -> Some(5)), Check.Check(_ -> Some(9)));
+//     Assert.eq(Some(5), cf(0))
+
+// @Test
+// def testOr2(): Bool =
+//     let Check.Check(cf) = Check.Check(_ -> Some(5)) <|> Check.Check(_ -> Some(9));
+//     Assert.eq(Some(5), cf(0))
+
+// @Test
+// def testOrNone(): Bool =
+//     let Check.Check(cf) = Check.Check(_ -> None) <|> Check.Check(_ -> Some(9));
+//     Assert.eq(Some(9), cf(0))
+
+// @Test
+// def testOrNone2(): Bool =
+//     let Check.Check(cf) = Check.Check(_ -> None) <|> Check.Check(_ -> None);
+//     Assert.eq(None: Option[Int32], cf(0))
+
+// @Test
+// def testOrChained(): Bool =
+//     let Check.Check(cf) = Check.Check(_ -> None) <|> Check.Check(_ -> Some(1))
+//         <|> Check.Check(_ -> Some(2)) <|> Check.Check(_ -> Some(3));
+//     Assert.eq(Some(1), cf(0))
+
+// @Test
+// def testOrAssoc(): Bool =
+//     let Check.Check(cf1) = Check.Check(_-> Some(1))
+//         <|> (Check.Check(_ -> Some(2)) <|> Check.Check(_ -> Some(3)));
+//     let Check.Check(cf2) = (Check.Check(_-> Some(1)) <|> Check.Check(_ -> Some(2)))
+//         <|> Check.Check(_ -> Some(3));
+//     Assert.eq(cf1(0), cf2(0))
+
+// @Test
+// def testOrAssoc2(): Bool =
+//     let Check.Check(cf1) = Check.Check(_-> None)
+//         <|> (Check.Check(_ -> Some(2)) <|> Check.Check(_ -> Some(3)));
+//     let Check.Check(cf2) = (Check.Check(_-> None) <|> Check.Check(_ -> Some(2)))
+//         <|> Check.Check(_ -> Some(3));
+//     Assert.eq(cf1(0), cf2(0))
+
+// @Test
+// def testChoice(): Bool =
+//     let Check.Check(cf) = choice(Check.Check(_ -> None) :: Check.Check(_ -> None)
+//          :: Check.Check(_ -> Some(9)) :: Check.Check(_ -> Some(1)) :: Nil);
+//     Assert.eq(Some(9), cf(0))
 /// ```
 ///
 pub lawful class GradedAlternative[m: Bool -> Type -> Type] with GradedApplicative[m] {
