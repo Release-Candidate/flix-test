@@ -1,3 +1,6 @@
+> [!WARNING]
+> This repository has been moved to [Codeberg: codeberg.org/Release-Candidate/flix-test](https://codeberg.org/Release-Candidate/flix-test)
+
 # Flix Test
 
 Some random [Flix](https://flix.dev/) stuff.
